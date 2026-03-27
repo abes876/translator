@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Voice Translator</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#060b14;color:#e0e4ea;user-select:none;-webkit-user-select:none}
+body{display:flex;flex-direction:column;max-width:480px;margin:0 auto}
+.header{text-align:center;padding:max(env(safe-area-inset-top),24px) 20px 6px}
+.header .sub{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:#4a5568;font-weight:600}
+.header h1{font-size:24px;font-weight:700;margin:4px 0 0;background:linear-gradient(135deg,#7eb8f7,#c084fc,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.status-bar{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 20px;font-size:12px;color:#5a6a80}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#2d3748;transition:all .3s}
+.status-dot.en{background:#60a5fa;box-shadow:0 0 8px #60a5fa66}
+.status-dot.es{background:#f87171;box-shadow:0 0 8px #f87171aa}
+.btn-wrap{display:flex;justify-content:center;gap:20px;padding:14px 20px 8px}
+.lang-btn{width:120px;height:120px;border-radius:50%;background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.01));border:2px solid rgba(255,255,255,.08);cursor:pointer;position:relative;outline:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:all .3s cubic-bezier(.4,0,.2,1)}
+.lang-btn .flag{font-size:32px}
+.lang-btn .label{font-size:11px;font-weight:600;color:#6b7280;letter-spacing:1px;text-transform:uppercase}
+.lang-btn.active-en{border-color:rgba(96,165,250,.6);box-shadow:0 0 40px rgba(96,165,250,.2);animation:breathe 2s ease-in-out infinite}
+.lang-btn.active-en .label{color:#60a5fa}
+.lang-btn.active-es{border-color:rgba(248,113,113,.6);box-shadow:0 0 40px rgba(248,113,113,.2);animation:breathe 2s ease-in-out infinite}
+.lang-btn.active-es .label{color:#f87171}
+.stop-btn{width:80px;height:80px;border-color:rgba(239,68,68,.4)}
+.stop-btn .flag{font-size:24px}
+.stop-btn .label{color:#ef4444}
+.wave{display:flex;align-items:center;justify-content:center;gap:2.5px;height:34px;margin:6px 20px}
+.wave .b{width:3px;border-radius:2px;background:#2d3748;transition:height .07s linear;height:3px}
+.cards{flex:1;overflow-y:auto;padding:8px 20px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch;padding-bottom:max(env(safe-area-inset-bottom),20px)}
+.card{border-radius:16px;padding:12px 16px;animation:fadeIn .3s ease}
+.card.orig{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+.card.tr-en{background:rgba(10,22,40,.6);border:1px solid rgba(96,165,250,.25)}
+.card.tr-es{background:rgba(26,10,12,.6);border:1px solid rgba(248,113,113,.25)}
+.card .lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#5a6a80;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.card .lbl .right{margin-left:auto}
+.card .txt{font-size:15px;line-height:1.5;color:#c8d0dc;transition:font-size .2s}
+.card.tr-en .txt,.card.tr-es .txt{font-size:17px;font-weight:500;color:#f3f4f6}
+body.sz-lg .card .txt{font-size:20px}
+body.sz-lg .card.tr-en .txt,body.sz-lg .card.tr-es .txt{font-size:24px}
+body.sz-xl .card .txt{font-size:26px}
+body.sz-xl .card.tr-en .txt,body.sz-xl .card.tr-es .txt{font-size:32px}
+.toolbar{display:flex;justify-content:center;gap:8px;padding:0 20px 4px}
+.tbtn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:5px 14px;font-size:11px;color:#6b7280;cursor:pointer;outline:none;transition:all .2s}
+.tbtn.on{background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.35);color:#a78bfa}
+.rbtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:3px 10px;font-size:11px;color:#9ca3af;cursor:pointer;outline:none}
+.shimmer{font-size:14px;background:linear-gradient(90deg,#4a5568,#9ca3af,#4a5568);background-size:200% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 1.5s infinite}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;opacity:.4;padding:30px 0}
+.empty .big{font-size:44px}
+.empty p{font-size:13px;color:#6b7280;text-align:center;line-height:1.7}
+.err{margin:0 20px;padding:10px 14px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.25);border-radius:12px;font-size:12px;color:#fca5a5;animation:fadeIn .3s;display:none}
+.footer{padding:8px 20px 20px;text-align:center;font-size:10px;color:#1e293b}
+.sep{border:none;border-top:1px solid rgba(255,255,255,.03);margin:2px 0}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="sub">Real-Time</div>
+  <h1>Voice Translator</h1>
+</div>
+<div class="status-bar">
+  <div class="status-dot" id="dot"></div>
+  <span id="stxt">Tap a language to speak</span>
+</div>
+<div class="btn-wrap">
+  <button class="lang-btn" id="btnEn" onclick="toggleLang('en')">
+    <span class="flag">🇺🇸</span>
+    <span class="label">English</span>
+  </button>
+  <button class="lang-btn stop-btn" id="btnStop" onclick="stopListening()" style="display:none">
+    <span class="flag">⏹️</span>
+    <span class="label">Stop</span>
+  </button>
+  <button class="lang-btn" id="btnEs" onclick="toggleLang('es')">
+    <span class="flag">🇪🇸</span>
+    <span class="label">Español</span>
+  </button>
+</div>
+<div class="wave" id="wave"></div>
+<div class="toolbar">
+  <button class="tbtn on" id="szSm" onclick="setSize('sm')">A</button>
+  <button class="tbtn" id="szLg" onclick="setSize('lg')">A+</button>
+  <button class="tbtn" id="szXl" onclick="setSize('xl')">A++</button>
+</div>
+<div class="err" id="err"></div>
+<div class="cards" id="cards">
+  <div class="empty"><div class="big">🎙️</div><p>Tap 🇺🇸 to speak English<br>Tap 🇪🇸 to speak Spanish<br>Translation is automatic.</p></div>
+</div>
+<div class="footer">Tap language · Speak · Hear translation · Powered by Claude<br><button id="dbgToggle" onclick="toggleDbg()" style="margin-top:4px;background:none;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:3px 10px;font-size:10px;color:#3a4558;cursor:pointer">Show Logs</button></div>
+
+<script>
+const L={en:{code:'en-US',label:'English',flag:'🇺🇸'},es:{code:'es-ES',label:'Español',flag:'🇪🇸'}};
+let activeLang=null,rec=null,hist=[],bars=[],apiKey=new URLSearchParams(location.search).get('key')||'',speaking=false,translating=false;
+let silenceTimer=null,pendingText='';
+const SILENCE_FINAL=600;
+const SILENCE_INTERIM=1800;
+const MODEL_FAST='claude-haiku-4-5-20251001';
+const MODEL_FALLBACK='claude-sonnet-4-20250514';
+let model=MODEL_FAST;
+const $=id=>document.getElementById(id);
+
+// build waveform
+for(let i=0;i<28;i++){const b=document.createElement('div');b.className='b';$('wave').appendChild(b);bars.push(b)}
+let wInt;
+function animW(a,c){
+  clearInterval(wInt);
+  if(!a){bars.forEach(b=>{b.style.height='3px';b.style.background='#2d3748'});return}
+  wInt=setInterval(()=>{bars.forEach((b,i)=>{const r=Math.abs(i-14)/14;b.style.height=((1-r)*24+3)*(.25+Math.random()*.75)+'px';b.style.background=c||'#34d399'})},80);
+}
+
+function setS(t,cls){$('dot').className='status-dot'+(cls?' '+cls:'');$('stxt').textContent=t}
+function err(m){const e=$('err');e.style.display=m?'block':'none';e.textContent=m?'⚠️ '+m:''}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+function speak(text,lang){
+  if(!text||!speechSynthesis)return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang=L[lang].code;u.rate=.95;u.pitch=1.0;
+  const voices=speechSynthesis.getVoices();
+  let pick=null;
+  if(lang==='en'){
+    // English = gentle female voice
+    const prefs=['Karen','Samantha','Moira','Tessa','Google UK English Female','Shelley (English (United States))','Sandy (English (United States))'];
+    for(const p of prefs){pick=voices.find(v=>v.name.includes(p)&&v.lang.startsWith('en'));if(pick)break}
+    if(!pick)pick=voices.find(v=>v.lang.startsWith('en')&&/female|woman/i.test(v.name));
+    if(!pick)pick=voices.find(v=>v.lang.startsWith('en'));
+  } else {
+    // Spanish = male voice
+    const prefs=['Google español','Google español de Estados Unidos','Reed (Spanish (Mexico))','Reed (Spanish (Spain))','Rocko (Spanish (Mexico))','Rocko (Spanish (Spain))'];
+    for(const p of prefs){pick=voices.find(v=>v.name.includes(p)&&v.lang.startsWith('es'));if(pick)break}
+    if(!pick)pick=voices.find(v=>v.lang.startsWith('es'));
+  }
+  if(pick){u.voice=pick;dbg('Voice: '+pick.name)}
+  else{dbg('Voice: default for '+lang)}
+  speechSynthesis.speak(u);
+}
+
+async function translate(text,from){
+  if(!text.trim()||translating)return;
+  translating=true;
+  const to=from==='en'?'es':'en';
+  // show translating card
+  const tc=document.createElement('div');
+  tc.className='card orig';tc.id='tempCard';
+  tc.innerHTML='<div class="lbl">🎤 '+L[from].flag+' '+L[from].label+'</div><div class="txt">'+esc(text)+'</div><div style="margin-top:8px"><span class="shimmer">Translating…</span></div>';
+  const cards=$('cards');
+  cards.insertBefore(tc,cards.firstChild);
+  setS('Translating…',from);
+
+  try{
+    let usedModel=model,raw='';
+    const sysPrompt='Translate the following '+L[from].label+' text to '+L[to].label+'. Reply ONLY with the translation, nothing else. Be natural, preserve tone.';
+    for(let attempt=0;attempt<3;attempt++){
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:usedModel,max_tokens:150,stream:true,
+          system:sysPrompt,
+          messages:[{role:'user',content:text}]})
+      });
+      dbg('API ['+usedModel+'] status='+res.status+' attempt='+(attempt+1));
+      if(res.status===404&&usedModel===MODEL_FAST){
+        dbg('Haiku unavailable, falling back to Sonnet');
+        usedModel=MODEL_FALLBACK;model=MODEL_FALLBACK;continue;
+      }
+      if(res.status===529||res.status===429){
+        const wait=(attempt+1)*1000;
+        dbg('Overloaded, retry in '+wait+'ms');
+        setS('API busy…',from);
+        await new Promise(r=>setTimeout(r,wait));
+        continue;
+      }
+      if(!res.ok){const e=await res.json();throw new Error(e.error?.message||JSON.stringify(e))}
+      // Stream SSE response
+      raw='';
+      const reader=res.body.getReader();
+      const decoder=new TextDecoder();
+      let buf='';
+      while(true){
+        const{done,value}=await reader.read();
+        if(done)break;
+        buf+=decoder.decode(value,{stream:true});
+        const lines=buf.split('\n');
+        buf=lines.pop();
+        for(const line of lines){
+          if(!line.startsWith('data: '))continue;
+          const d=line.slice(6);
+          if(d==='[DONE]')break;
+          try{
+            const ev=JSON.parse(d);
+            if(ev.type==='content_block_delta'&&ev.delta?.text)raw+=ev.delta.text;
+          }catch(e){}
+        }
+      }
+      break;
+    }
+    raw=raw.replace(/```json|```|^"|"$/g,'').trim();
+    dbg('Translation: '+raw.substring(0,100));
+    if(!raw)throw new Error('Empty response');
+
+    const translation=raw;
+    animW(true,to==='en'?'#60a5fa':'#f87171');
+    setS(L[from].label+' → '+L[to].label,to);
+
+    hist.unshift({from,orig:text,trans:translation,to,t:Date.now()});
+    if(hist.length>15)hist.pop();
+    render();
+
+    // Pause mic, speak translation, resume
+    speaking=true;translating=false;
+    if(rec){try{rec.abort()}catch(e){}}
+    speechSynthesis.cancel();
+    dbg('Speaking '+L[to].label+'…');
+    setS('Speaking…',to);
+    animW(false);
+    speak(translation,to);
+    await new Promise(resolve=>{
+      const check=setInterval(()=>{if(!speechSynthesis.speaking){clearInterval(check);resolve()}},50);
+      setTimeout(()=>{clearInterval(check);resolve()},10000);
+    });
+    await new Promise(r=>setTimeout(r,200));
+    speaking=false;
+    dbg('Speech done, resuming mic');
+    if(activeLang){setS('Listening for '+L[activeLang].label+'…',activeLang);animW(true,activeLang==='en'?'#60a5fa':'#f87171');startR()}
+  }catch(e){
+    console.error(e);
+    dbg('TRANSLATE ERROR: '+e.message);
+    err('Translation failed: '+e.message);setTimeout(()=>err(''),5000);
+    const t=document.getElementById('tempCard');if(t)t.remove();
+    translating=false;
+    if(activeLang&&!speaking){setS('Listening for '+L[activeLang].label+'…',activeLang);animW(true);startR()}
+  }
+}
+
+function render(){
+  const c=$('cards');c.innerHTML='';
+  if(!hist.length){c.innerHTML='<div class="empty"><div class="big">🎙️</div><p>Tap 🇺🇸 to speak English<br>Tap 🇪🇸 to speak Spanish<br>Translation is automatic.</p></div>';return}
+  hist.forEach((h,i)=>{
+    const d=document.createElement('div');
+    d.style.cssText='display:flex;flex-direction:column;gap:6px;animation:fadeIn .3s ease';
+    d.innerHTML=`
+      <div class="card orig"><div class="lbl"><span>${L[h.from].flag}</span> ${L[h.from].label}</div><div class="txt">${esc(h.orig)}</div></div>
+      <div class="card tr-${h.to}"><div class="lbl"><span>${L[h.to].flag}</span> ${L[h.to].label}<span class="right"><button class="rbtn" data-idx="${i}">🔊 Replay</button></span></div><div class="txt">${esc(h.trans)}</div></div>
+    `;
+    d.querySelector('.rbtn').onclick=()=>speak(h.trans,h.to);
+    c.appendChild(d);
+    if(i<hist.length-1){const s=document.createElement('hr');s.className='sep';c.appendChild(s)}
+  });
+}
+
+let dbgLog=[],dbgVisible=false;
+function dbg(msg){
+  dbgLog.push(msg);
+  const d=document.getElementById('dbg');
+  if(d){d.innerHTML=msg+'<br>'+d.innerHTML;if(d.children.length>30)d.lastChild.remove()}
+}
+function toggleDbg(){
+  dbgVisible=!dbgVisible;
+  let d=document.getElementById('dbg');
+  let cp=document.getElementById('copyBtn');
+  if(!d){
+    d=document.createElement('div');d.id='dbg';d.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#111;color:#0f0;font-size:10px;font-family:monospace;padding:6px 10px;max-height:120px;overflow-y:auto;z-index:999;opacity:0.85;display:none';
+    d.innerHTML=dbgLog.slice(-30).reverse().map(m=>'<div>'+m+'</div>').join('');
+    cp=document.createElement('button');cp.id='copyBtn';cp.textContent='COPY';cp.style.cssText='position:fixed;bottom:122px;right:10px;z-index:1000;background:#f59e0b;color:#000;border:none;padding:6px 12px;border-radius:8px;font-weight:bold;font-size:12px;display:none';
+    cp.onclick=()=>{navigator.clipboard.writeText(dbgLog.join('\n')).then(()=>{cp.textContent='COPIED!';setTimeout(()=>cp.textContent='COPY',1500)}).catch(()=>{const ta=document.createElement('textarea');ta.value=dbgLog.join('\n');document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();cp.textContent='COPIED!';setTimeout(()=>cp.textContent='COPY',1500)})};
+    const cl=document.createElement('button');cl.textContent='✕';cl.style.cssText='position:fixed;bottom:122px;left:10px;z-index:1000;background:#ef4444;color:#fff;border:none;width:28px;height:28px;border-radius:50%;font-size:14px;font-weight:bold;cursor:pointer';
+    cl.onclick=toggleDbg;
+    document.body.appendChild(cl);cl.id='closeBtn';
+    document.body.appendChild(cp);document.body.appendChild(d);
+  }
+  d.style.display=dbgVisible?'block':'none';
+  cp.style.display=dbgVisible?'block':'none';
+  const cl=document.getElementById('closeBtn');if(cl)cl.style.display=dbgVisible?'block':'none';
+  $('dbgToggle').textContent=dbgVisible?'Hide Logs':'Show Logs';
+}
+
+function startR(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){err('Speech Recognition not supported.');dbg('ERROR: No SpeechRecognition API');return}
+  if(rec){try{rec.abort()}catch(e){}}
+
+  const lang=activeLang;
+  const r=new SR();
+  r.lang=L[lang].code;
+  r.interimResults=true;
+  r.continuous=true;
+  r.maxAlternatives=1;
+  dbg('Listening '+L[lang].label);
+
+  r.onspeechstart=()=>{dbg('Speech detected')};
+  r.onspeechend=()=>{dbg('Speech ended')};
+
+  let processedIdx=0;
+
+  r.onresult=e=>{
+    if(speaking)return;
+    clearTimeout(silenceTimer);
+    let fin='',interim='';
+    for(let i=processedIdx;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      const c=e.results[i][0].confidence;
+      if(e.results[i].isFinal){
+        fin+=t;
+        processedIdx=i+1;
+        dbg('FINAL: "'+t+'" conf='+c.toFixed(2));
+      } else {
+        interim+=t;
+        dbg('INTERIM: "'+t+'"');
+      }
+    }
+    pendingText=(pendingText+' '+fin).trim();
+    const display=(pendingText+' '+interim).trim();
+    if(display){
+      let lc=document.getElementById('liveCard');
+      if(!lc){lc=document.createElement('div');lc.id='liveCard';lc.className='card orig';lc.innerHTML='<div class="lbl">🎤 Listening…</div><div class="txt" id="liveTxt"></div>';$('cards').insertBefore(lc,$('cards').firstChild)}
+      document.getElementById('liveTxt').textContent=display;
+    }
+    const hasFinal=!!pendingText.trim();
+    const delay=hasFinal?SILENCE_FINAL:SILENCE_INTERIM;
+    const curInterim=interim; // snapshot for closure
+    const textToCheck=pendingText||curInterim;
+    if(textToCheck.trim()){
+      silenceTimer=setTimeout(()=>{
+        if(speaking||translating)return;
+        let text=pendingText.trim();
+        if(!text){text=curInterim.trim();processedIdx=e.results.length}
+        if(text){
+          dbg('Silence '+delay+'ms → translate: "'+text+'"');
+          pendingText='';
+          const lc=document.getElementById('liveCard');if(lc)lc.remove();
+          translate(text,lang);
+        }
+      },delay);
+    }
+  };
+
+  r.onerror=e=>{
+    if(e.error==='not-allowed'){
+      dbg('ERROR: mic denied');
+      err('Microphone denied. Check browser permissions.');
+      stopListening();
+    } else if(e.error==='no-speech'||e.error==='aborted'){
+      // silent — expected during normal operation
+    } else {
+      dbg('ERROR: '+e.error);
+      err('Speech error: '+e.error);setTimeout(()=>err(''),3000);
+    }
+  };
+
+  r.onend=()=>{
+    if(activeLang&&!speaking){
+      if(pendingText.trim()){
+        const text=pendingText.trim();pendingText='';
+        const lc=document.getElementById('liveCard');if(lc)lc.remove();
+        dbg('Translating pending: "'+text+'"');
+        translate(text,lang);
+      }
+      setTimeout(()=>{if(activeLang&&!speaking)startR()},80);
+    }
+  };
+  rec=r;
+  try{r.start()}catch(e){dbg('START ERROR: '+e.message);err('Mic error: '+e.message)}
+}
+
+function stopListening(){
+  activeLang=null;
+  translating=false;pendingText='';clearTimeout(silenceTimer);
+  speechSynthesis.cancel();speaking=false;
+  if(rec){try{rec.abort()}catch(e){}}
+  rec=null;
+  const lc=document.getElementById('liveCard');if(lc)lc.remove();
+  $('btnEn').className='lang-btn';$('btnEn').style.display='';
+  $('btnEs').className='lang-btn';$('btnEs').style.display='';
+  $('btnStop').style.display='none';
+  setS('Tap a language to speak','');
+  animW(false);
+  dbg('Stopped');
+}
+
+function toggleLang(lang){
+  err('');
+  if(!apiKey){
+    const k=prompt('Paste your Anthropic API key:');
+    if(!k||!k.trim())return;
+    apiKey=k.trim();
+  }
+  if(activeLang===lang)return; // already listening for this language
+  // Prime speechSynthesis on user gesture (iOS requires this to unlock audio)
+  const primer=new SpeechSynthesisUtterance('');
+  primer.volume=0;
+  speechSynthesis.speak(primer);
+  // Stop current if any
+  if(rec){try{rec.abort()}catch(e){}}
+  translating=false;pendingText='';clearTimeout(silenceTimer);
+  speechSynthesis.cancel();speaking=false;
+  const lc=document.getElementById('liveCard');if(lc)lc.remove();
+
+  activeLang=lang;
+  // Show active button + stop button, hide the other language
+  $('btnEn').className='lang-btn'+(lang==='en'?' active-en':'');
+  $('btnEs').className='lang-btn'+(lang==='es'?' active-es':'');
+  $('btnEn').style.display=lang==='en'?'':'none';
+  $('btnEs').style.display=lang==='es'?'':'none';
+  $('btnStop').style.display='';
+  setS('Listening for '+L[lang].label+'…',lang);
+  animW(true,lang==='en'?'#60a5fa':'#f87171');
+  startR();
+}
+
+// Font size toggle
+let curSize='sm';
+function setSize(sz){
+  curSize=sz;
+  document.body.classList.remove('sz-lg','sz-xl');
+  if(sz!=='sm')document.body.classList.add('sz-'+sz);
+  $('szSm').className='tbtn'+(sz==='sm'?' on':'');
+  $('szLg').className='tbtn'+(sz==='lg'?' on':'');
+  $('szXl').className='tbtn'+(sz==='xl'?' on':'');
+}
+
+// Swipe to switch language
+let touchX=0;
+document.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX},{passive:true});
+document.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-touchX;
+  if(Math.abs(dx)<80)return; // too short, ignore
+  if(!activeLang)return; // not listening, ignore
+  const newLang=dx>0?'en':'es'; // swipe right=English, swipe left=Spanish
+  if(newLang!==activeLang)toggleLang(newLang);
+});
+
+speechSynthesis.getVoices();
+if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();
+
+function listVoices(){
+  const v=speechSynthesis.getVoices();
+  const en=v.filter(x=>x.lang.startsWith('en')).map(x=>x.name+' ('+x.lang+')').join('\n');
+  const es=v.filter(x=>x.lang.startsWith('es')).map(x=>x.name+' ('+x.lang+')').join('\n');
+  dbg('=== EN VOICES ===\n'+en+'\n=== ES VOICES ===\n'+es);
+}
+setTimeout(listVoices,1000);
+</script>
+</body>
+</html>
