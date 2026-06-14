@@ -128,7 +128,7 @@ const L={
 const targetIds=['es','zhTW','nanTW','hakTW','ja'];
 var targetLang='es';
 let activeLang=null,rec=null,hist=[],bars=[],apiKey=new URLSearchParams(location.search).get('key')||'',speaking=false,translating=false;
-let silenceTimer=null,pendingText='';
+let silenceTimer=null,pendingText='',queuedTranslation=null;
 const SILENCE_FINAL=600;
 const SILENCE_INTERIM=1800;
 const MODEL_FAST='claude-haiku-4-5-20251001';
@@ -154,6 +154,7 @@ function setS(t,lang){
 }
 function err(m){const e=$('err');e.style.display=m?'block':'none';e.textContent=m?'⚠ '+m:''}
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function norm(s){return s.replace(/\s+/g,' ').trim().toLowerCase()}
 function target(){return L[targetLang]}
 function pairLabel(){return 'English ↔ '+target().short}
 
@@ -207,18 +208,33 @@ function speak(text,lang){
   speechSynthesis.speak(u);
 }
 
-async function translate(text,from){
-  if(!text.trim()||translating)return;
+function shouldReplaceWithQueued(currentText,currentFrom,currentTarget){
+  if(!queuedTranslation)return false;
+  if(queuedTranslation.from!==currentFrom||queuedTranslation.targetLang!==currentTarget)return false;
+  const cur=norm(currentText),next=norm(queuedTranslation.text);
+  return next&&next!==cur&&next.length>cur.length&&(next.includes(cur)||cur.includes(next.slice(0,Math.max(1,cur.length-2))));
+}
+
+async function translate(text,from,targetSnapshot){
+  text=text.trim();
+  if(!text)return;
+  const selectedTarget=targetSnapshot||targetLang;
+  if(translating){
+    queuedTranslation={text,from,targetLang:selectedTarget};
+    dbg('Queued while translating: '+L[from].short+' → '+(from==='en'?L[selectedTarget].short:'English')+' "'+text.substring(0,80)+'"');
+    setS('Finishing current translation…',from);
+    return;
+  }
   if(!ensureApiKey())return;
   translating=true;
-  const activeTarget=targetLang;
-  const to=from==='en'?activeTarget:'en';
+  const to=from==='en'?selectedTarget:'en';
   const fromCfg=L[from],toCfg=L[to];
   const tc=document.createElement('div');
   tc.className='card orig';tc.id='tempCard';
   tc.innerHTML='<div class="lbl">🎤 '+fromCfg.flag+' '+fromCfg.short+'</div><div class="txt">'+esc(text)+'</div><div style="margin-top:8px"><span class="shimmer">Translating…</span></div>';
   $('cards').insertBefore(tc,$('cards').firstChild);
   setS('Translating…',from);
+  if(rec){try{rec.abort()}catch(e){}}
 
   try{
     let usedModel=model,raw='';
@@ -274,6 +290,15 @@ async function translate(text,from){
     dbg('Translation: '+raw.substring(0,100));
     if(!raw)throw new Error('Empty response');
 
+    if(shouldReplaceWithQueued(text,from,selectedTarget)){
+      const next=queuedTranslation;
+      queuedTranslation=null;
+      const temp=document.getElementById('tempCard');if(temp)temp.remove();
+      translating=false;
+      dbg('Replacing partial phrase with queued final phrase');
+      return translate(next.text,next.from,next.targetLang);
+    }
+
     const temp=document.getElementById('tempCard');if(temp)temp.remove();
     const translation=raw;
     animW(true,to);
@@ -296,6 +321,12 @@ async function translate(text,from){
     });
     await new Promise(r=>setTimeout(r,200));
     speaking=false;
+    if(queuedTranslation){
+      const next=queuedTranslation;
+      queuedTranslation=null;
+      dbg('Processing queued phrase');
+      return translate(next.text,next.from,next.targetLang);
+    }
     dbg('Speech done, resuming mic if active');
     if(activeLang){setS('Listening for '+L[activeLang].short+'…',activeLang);animW(true,activeLang);startR()}
   }catch(e){
@@ -304,6 +335,11 @@ async function translate(text,from){
     err('Translation failed: '+e.message);setTimeout(()=>err(''),5000);
     const t=document.getElementById('tempCard');if(t)t.remove();
     translating=false;
+    if(queuedTranslation){
+      const next=queuedTranslation;
+      queuedTranslation=null;
+      return translate(next.text,next.from,next.targetLang);
+    }
     if(activeLang&&!speaking){setS('Listening for '+L[activeLang].short+'…',activeLang);animW(true,activeLang);startR()}
   }
 }
@@ -364,6 +400,7 @@ function toggleDbg(){
 function startR(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){err('Speech Recognition not supported.');dbg('ERROR: No SpeechRecognition API');return}
+  if(translating){dbg('Skip mic start during translation');return}
   if(rec){try{rec.abort()}catch(e){}}
 
   const lang=activeLang;
@@ -415,7 +452,7 @@ function startR(){
           dbg('Silence '+delay+'ms → translate: "'+text+'"');
           pendingText='';
           const lc=document.getElementById('liveCard');if(lc)lc.remove();
-          translate(text,lang);
+          translate(text,lang,targetLang);
         }
       },delay);
     }
@@ -439,14 +476,14 @@ function startR(){
   };
 
   r.onend=()=>{
-    if(activeLang&&!speaking){
+    if(activeLang&&!speaking&&!translating){
       if(pendingText.trim()){
         const text=pendingText.trim();pendingText='';
         const lc=document.getElementById('liveCard');if(lc)lc.remove();
         dbg('Translating pending: "'+text+'"');
-        translate(text,lang);
+        translate(text,lang,targetLang);
       }
-      setTimeout(()=>{if(activeLang&&!speaking)startR()},80);
+      setTimeout(()=>{if(activeLang&&!speaking&&!translating)startR()},80);
     }
   };
   rec=r;
@@ -455,7 +492,7 @@ function startR(){
 
 function stopListening(){
   activeLang=null;
-  translating=false;pendingText='';clearTimeout(silenceTimer);
+  translating=false;pendingText='';queuedTranslation=null;clearTimeout(silenceTimer);
   speechSynthesis.cancel();speaking=false;
   if(rec){try{rec.abort()}catch(e){}}
   rec=null;
