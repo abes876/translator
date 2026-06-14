@@ -1,18 +1,28 @@
 # Voice Translator
 
-Real-time bilingual voice translator (English <-> Spanish) built as a single-page HTML app.
+Real-time English-centered voice translator built as a single-page HTML app.
 
 **Live:** [abes876.github.io/translator](https://abes876.github.io/translator/)
 
 ## How It Works
 
-1. Tap **English** or **Spanish** to start listening
-2. Speak in the selected language
-3. The app translates and speaks the translation aloud
-4. Tap **Stop** to end
+1. Pick the non-English language from the **English ↔** menu
+2. Tap **English** or the selected language to start listening
+3. Speak in the selected language
+4. The app translates to the other side of the pair and speaks the translation aloud
+5. Tap **Stop** to end
 
-- English input -> Spanish translation (male voice)
-- Spanish input -> English translation (female voice)
+You can also type text and translate it in either direction when voice input is not available.
+
+## Languages
+
+- English ↔ Spanish
+- English ↔ Mandarin Chinese (Taiwan, Traditional Chinese)
+- English ↔ Taiwanese Hokkien
+- English ↔ Taiwan Hakka
+- English ↔ Japanese
+
+Browser speech recognition support varies by language. Spanish, Mandarin Chinese, and Japanese are broadly supported in modern browsers; Taiwanese Hokkien and Taiwan Hakka are available through typed translation and may fall back to typed input for speech recognition.
 
 ## Tech Stack
 
